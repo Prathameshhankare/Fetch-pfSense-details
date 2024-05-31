@@ -16,28 +16,40 @@ def prompt_user_choice():
     return choice
 
 def get_csrf_token(BASE_URL):
-    response = requests.get(BASE_URL, verify=False)
-    html_content = response.text
-    csrf_token = html_content.split('var csrfMagicToken = "')[1].split('"')[0]
-    return csrf_token
+    try:
+        response = requests.get(BASE_URL, verify=False, timeout=10)
+        response.raise_for_status()
+        html_content = response.text
+        csrf_token = html_content.split('var csrfMagicToken = "')[1].split('"')[0]
+        return csrf_token
+    except (requests.RequestException, IndexError) as e:
+        print("Failed to get CSRF token from {}: {}".format(BASE_URL, e))
+        return None
 
 def login_to_pfSense(BASE_URL, username, password):
     csrf_token = get_csrf_token(BASE_URL)
+    if not csrf_token:
+        return None
     login_data = {
         "__csrf_magic": csrf_token,
         "usernamefld": username,
         "passwordfld": password,
         "login": "Login"
     }
-    login_response = requests.post(BASE_URL, data=login_data, verify=False)
-    return login_response
+    try:
+        login_response = requests.post(BASE_URL, data=login_data, verify=False, timeout=10)
+        login_response.raise_for_status()
+        return login_response
+    except requests.RequestException as e:
+        print("Failed to login to pfSense at {}: {}".format(BASE_URL, e))
+        return None
 
 def fetch_pfSense_details(pfSense_ip, username, password, store_name):
     BASE_URL = "https://" + pfSense_ip
-    print("Logging in to the pfSense at IP:", pfSense_ip, "for store:", store_name)
+    print("Logging in to the pfSense at IP: {} for store: {}".format(pfSense_ip, store_name))
     login_response = login_to_pfSense(BASE_URL, username, password)
-    if "Dashboard" in login_response.text:
-        print("Logged in to the pfSense at IP:", pfSense_ip)
+    if login_response and "Dashboard" in login_response.text:
+        print("Logged in to the pfSense at IP: {}".format(pfSense_ip))
         soup = BeautifulSoup(login_response.text, 'html.parser')
         version_info = soup.find('th', text='Version').find_next_sibling('td').text.strip().split('\n')[0]
         system_info = soup.find('th', text='System').find_next_sibling('td')
@@ -48,11 +60,14 @@ def fetch_pfSense_details(pfSense_ip, username, password, store_name):
             else:
                 system_type = system_info_text.split("Netgate Device ID")[0].strip()
         uptime = soup.find('th', text='Uptime').find_next_sibling('td').text.strip()
-        print("Fetching details for pfSense IP:", pfSense_ip, "for store:", store_name)
+        print("Fetching details for pfSense IP: {} for store: {}".format(pfSense_ip, store_name))
         return version_info, system_type, uptime
     else:
-        print("Failed to fetch details for pfSense IP:", pfSense_ip, "for store:", store_name)
-        return None, None, None
+        if login_response and "pfSense" not in login_response.text:
+            print("Not a pfSense device at IP: {} for store: {}".format(pfSense_ip, store_name))
+        else:
+            print("Failed to fetch details for pfSense IP: {} for store: {}".format(pfSense_ip, store_name))
+        return "not a pfSense", "not a pfSense", "not a pfSense"
 
 def update_csv_with_pfSense_details(csv_file_path, username, password):
     with open(csv_file_path, 'r') as csvfile:
@@ -74,14 +89,13 @@ def update_csv_with_pfSense_details(csv_file_path, username, password):
             store_name = row['Store Name']
             pfSense_ip = row['pfSense IP']
             version_info, system_type, uptime = fetch_pfSense_details(pfSense_ip, username, password, store_name)
-            if version_info is not None:
-                row['pfSense Version'] = version_info
-                row['pfSense System Type'] = system_type
-                row['pfSense Uptime'] = uptime
-            else:
-                print("Failed to fetch details for pfSense IP: " + pfSense_ip)
+            if version_info == "not a pfSense":
+                print("Skipping {} as it is not a pfSense device.".format(pfSense_ip))
+            row['pfSense Version'] = version_info
+            row['pfSense System Type'] = system_type
+            row['pfSense Uptime'] = uptime
             writer.writerow(row)
-        print("Details saved to the CSV file:", csv_file_path)
+        print("Details saved to the CSV file: {}".format(csv_file_path))
         print("Saved!")
 
 def main():
