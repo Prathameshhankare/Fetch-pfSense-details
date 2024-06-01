@@ -46,7 +46,23 @@ pip install requests beautifulsoup4
 
 6. Choose whether to enter the pfSense IP manually or use the CSV file.
 
-## Example Output
+
+## Example Output if a user selects to provide IP manually
+
+```sh
+Enter your username: admin
+Enter your password: 
+Do you want to provide pfSense IP manually? (yes/no): yes
+Enter pfSense IP: 192.168.1.1
+('Logging in to the pfSense at IP:', '192.168.1.1', 'for store:', 'manual entry')
+('Logged in to the pfSense at IP:', '192.168.1.1')
+('Fetching details for pfSense IP:', '192.168.1.1', 'for store:', 'manual entry')
+pfSense Version: 2.5.2-RELEASE
+pfSense System Type: APU2
+pfSense Uptime: 15 days, 3 hours, 22 minutes
+```
+
+## Example Output if a user selects to provide IPs through CSV file
 
 ```sh
 Enter your username: admin
