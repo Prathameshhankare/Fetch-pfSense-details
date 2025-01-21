@@ -51,15 +51,20 @@ def fetch_pfSense_details(pfSense_ip, username, password, store_name):
     if login_response and "Dashboard" in login_response.text:
         print(f"Logged in to the pfSense at IP: {pfSense_ip}")
         soup = BeautifulSoup(login_response.text, 'html.parser')
-        version_info = soup.find('th', text='Version').find_next_sibling('td').text.strip().split('\n')[0]
-        system_info = soup.find('th', text='System').find_next_sibling('td')
+        
+        # Updated to use string argument for deprecation fix
+        version_info = soup.find('th', string='Version').find_next_sibling('td').text.strip().split('\n')[0]
+        system_info = soup.find('th', string='System').find_next_sibling('td')
+        
         if system_info:
             system_info_text = system_info.get_text(separator=" ").strip()
             if "PC Engines" in system_info_text:
                 system_type = system_info_text.split("PC Engines")[1].split("Netgate Device ID")[0].strip()
             else:
                 system_type = system_info_text.split("Netgate Device ID")[0].strip()
-        uptime = soup.find('th', text='Uptime').find_next_sibling('td').text.strip()
+        
+        uptime = soup.find('th', string='Uptime').find_next_sibling('td').text.strip()
+        
         print(f"Fetching details for pfSense IP: {pfSense_ip} for store: {store_name}")
         return version_info, system_type, uptime
     else:
